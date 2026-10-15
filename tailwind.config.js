@@ -10,14 +10,23 @@ export default {
         sans: ['Outfit', 'sans-serif'],
       },
       colors: {
+        ink: '#17211C',
+        stone: '#6B756F',
+        pine: {
+          DEFAULT: '#1F7A4D',
+          deep: '#145C38',
+          soft: '#E6F3EC',
+          line: '#C5DDD0',
+          mist: '#8FB39E',
+        },
         neu: {
-          base: '#F4F6F8', // Slightly cooler grey for premium feel
+          base: '#E8F0EB',
           white: '#FFFFFF',
-          text: '#2D3436', 
-          muted: '#636e72',
-          accent: '#6C5CE7',
-          'accent-hover': '#5849BE',
-          danger: '#FF7675',
+          text: '#17211C',
+          muted: '#6B756F',
+          accent: '#1F7A4D',
+          'accent-hover': '#145C38',
+          danger: '#D4564E',
           // Dark Mode Palette
           dark: {
             base: '#1E1E2E',

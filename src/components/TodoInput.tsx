@@ -1,17 +1,19 @@
 import { useState, useRef } from 'react'
-import { Plus, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Clock, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getTranslation } from '../i18n'
 import type { Language } from '../i18n'
 
 interface TodoInputProps {
-  onAdd: (text: string, dueTime?: Date | null) => void;
+  onAdd: (text: string, dueTime?: Date | null, details?: string) => void;
   language: Language;
 }
 
 export default function TodoInput({ onAdd, language }: TodoInputProps) {
   const t = getTranslation(language)
   const [text, setText] = useState('')
+  const [details, setDetails] = useState('')
+  const [showDetails, setShowDetails] = useState(false)
   const [showDuePicker, setShowDuePicker] = useState(false)
   const [selectedDate, setSelectedDate] = useState('')
   const [hour, setHour] = useState('12')
@@ -28,8 +30,10 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
         const m = Math.min(59, Math.max(0, parseInt(minute) || 0))
         due = new Date(`${selectedDate}T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`)
       }
-      onAdd(text, due)
+      onAdd(text, due, details)
       setText('')
+      setDetails('')
+      setShowDetails(false)
       setSelectedDate('')
       setHour('12')
       setMinute('00')
@@ -163,10 +167,10 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
           onClick={() => selectDay(day)}
           className={`
             w-7 h-7 rounded-lg text-xs font-semibold transition-all duration-100 cursor-pointer
-            ${selected ? 'bg-violet-500 text-white shadow-md shadow-violet-500/30' :
-              today ? 'bg-violet-100 text-violet-600' :
+            ${selected ? 'bg-pine text-white shadow-md shadow-pine/20' :
+              today ? 'bg-pine-soft text-pine' :
               past ? 'text-neu-muted/20 cursor-not-allowed' :
-              'text-neu-text/80 hover:bg-violet-50'}
+              'text-neu-text/80 hover:bg-pine-soft'}
           `}
         >
           {day}
@@ -181,25 +185,40 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
 
   return (
     <div className="space-y-3">
-      <form onSubmit={handleSubmit} className="flex gap-3">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="flex gap-3">
         <div className="flex-1 flex gap-2">
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={t.whatNeedsToBeDone}
-            className="w-full bg-white/70 backdrop-blur-xl rounded-[18px] px-5 py-3 outline-none text-neu-text placeholder-neu-muted/35 border border-white/60 transition-all duration-200 focus:bg-white/95 focus:border-violet-200 text-sm font-medium shadow-sm"
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={t.whatNeedsToBeDone}
+              className="w-full bg-white/92 rounded-[18px] pl-5 pr-11 py-3 outline-none text-neu-text placeholder-stone/70 border border-pine-line/80 transition-all duration-200 focus:bg-white focus:border-pine text-sm font-medium"
+            />
+            <button
+              type="button"
+              onClick={() => setShowDetails(open => !open)}
+              title={t.editDetails}
+              className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+                showDetails || details.trim()
+                  ? 'text-pine bg-pine-soft'
+                  : 'text-neu-muted/40 hover:text-pine hover:bg-pine-soft'
+              }`}
+            >
+              <FileText size={16} />
+            </button>
+          </div>
           
           <button
             type="button"
             onClick={toggleDuePicker}
             className={`w-[46px] h-[46px] rounded-[18px] flex items-center justify-center transition-all duration-200 cursor-pointer border flex-shrink-0 shadow-sm ${
               hasDue
-                ? 'bg-violet-500 border-violet-500 text-white shadow-violet-500/20'
+                ? 'bg-pine border-pine text-white shadow-pine/15'
                 : showDuePicker
-                ? 'bg-violet-100 border-violet-200 text-violet-600'
-                : 'bg-white/70 border-white/60 text-neu-muted/40 hover:text-violet-500 hover:border-violet-200 hover:bg-white/90'
+                ? 'bg-pine-soft border-pine-line text-pine'
+                : 'bg-white/70 border-white/60 text-neu-muted/40 hover:text-pine hover:border-pine-line hover:bg-white/90'
             }`}
           >
             <Clock size={18} />
@@ -209,10 +228,35 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
         <button
           type="submit"
           disabled={!text.trim()}
-          className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-[18px] w-[46px] h-[46px] flex items-center justify-center text-white shadow-lg shadow-violet-500/25 disabled:opacity-30 disabled:shadow-none transition-all duration-200 cursor-pointer flex-shrink-0 hover:scale-[1.02] active:scale-[0.98]"
+          className="bg-pine rounded-[18px] w-[46px] h-[46px] flex items-center justify-center text-white shadow-[0_8px_16px_-10px_rgba(31,122,77,0.9)] disabled:opacity-40 disabled:shadow-none transition-all duration-200 cursor-pointer flex-shrink-0 hover:bg-pine-deep active:scale-[0.98]"
         >
           <Plus size={20} strokeWidth={2.5} />
         </button>
+        </div>
+        <AnimatePresence>
+          {showDetails && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <textarea
+                autoFocus
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault()
+                    e.currentTarget.form?.requestSubmit()
+                  }
+                }}
+                placeholder={t.addDetails}
+                className="w-full h-24 px-4 py-3 text-sm leading-5 bg-white/70 border border-white/60 rounded-[18px] resize-none outline-none text-neu-text placeholder-neu-muted/35 focus:bg-white/95 focus:border-pine"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </form>
       
       {/* Due Picker */}
@@ -224,7 +268,7 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="p-3 bg-white rounded-2xl border border-violet-100/50 shadow-lg space-y-3 overflow-hidden"
+            className="p-3 bg-white rounded-2xl border border-pine-line shadow-lg space-y-3 overflow-hidden"
           >
             {/* Quick Options */}
             <div className="grid grid-cols-2 gap-2">
@@ -241,8 +285,8 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
                     onClick={() => selectQuickOption(opt.days)}
                     className={`py-2 rounded-xl text-[11px] font-semibold transition-colors duration-100 cursor-pointer ${
                       isSelected
-                        ? 'bg-violet-500 text-white'
-                        : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
+                        ? 'bg-pine text-white'
+                        : 'bg-pine-soft text-pine hover:bg-pine-soft'
                     }`}
                   >
                     {opt.label}
@@ -258,7 +302,7 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
                 <button
                   type="button"
                   onClick={prevMonth}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-neu-muted/50 hover:bg-violet-50 hover:text-violet-500 transition-colors cursor-pointer"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-neu-muted/50 hover:bg-pine-soft hover:text-pine transition-colors cursor-pointer"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -268,7 +312,7 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
                 <button
                   type="button"
                   onClick={nextMonth}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-neu-muted/50 hover:bg-violet-50 hover:text-violet-500 transition-colors cursor-pointer"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-neu-muted/50 hover:bg-pine-soft hover:text-pine transition-colors cursor-pointer"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -282,9 +326,9 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
             </div>
             
             {/* Time Input */}
-            <div className="flex flex-col gap-3 pt-3 border-t border-violet-50">
+            <div className="flex flex-col gap-3 pt-3 border-t border-pine-line/70">
               <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-neu-muted/40 uppercase tracking-wider">Time</span>
+                  <span className="text-[11px] font-medium text-stone">{t.time}</span>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="text"
@@ -302,9 +346,9 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
                         }
                       }}
                       onBlur={(e) => setHour(normalizeHour(e.target.value))}
-                      className="w-8 h-8 rounded-lg bg-violet-50/50 border border-violet-100 text-center text-xs font-bold text-violet-600 outline-none focus:border-violet-300 focus:bg-white transition-colors"
+                      className="w-8 h-8 rounded-lg bg-pine-soft/80 border border-pine-line text-center text-xs font-bold text-pine outline-none focus:border-pine focus:bg-white transition-colors"
                     />
-                    <span className="text-violet-300 font-bold">:</span>
+                    <span className="text-pine-mist font-bold">:</span>
                     <input
                       ref={minuteInputRef}
                       type="text"
@@ -314,7 +358,7 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => setMinute(e.target.value.replace(/\D/g, '').slice(0, 2))}
                       onBlur={(e) => setMinute(normalizeMinute(e.target.value))}
-                      className="w-8 h-8 rounded-lg bg-violet-50/50 border border-violet-100 text-center text-xs font-bold text-violet-600 outline-none focus:border-violet-300 focus:bg-white transition-colors"
+                      className="w-8 h-8 rounded-lg bg-pine-soft/80 border border-pine-line text-center text-xs font-bold text-pine outline-none focus:border-pine focus:bg-white transition-colors"
                     />
                   </div>
               </div>
@@ -327,8 +371,8 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
                     onClick={() => { setHour(h); setMinute('00') }}
                     className={`px-2 py-1.5 rounded-[10px] text-[10px] font-semibold transition-all cursor-pointer ${
                       hour === h && minute === '00'
-                        ? 'bg-violet-500 text-white shadow-md shadow-violet-500/20'
-                        : 'bg-violet-50/50 text-violet-500 hover:bg-violet-100'
+                        ? 'bg-pine text-white shadow-md shadow-pine/15'
+                        : 'bg-pine-soft/80 text-pine hover:bg-pine-soft'
                     }`}
                   >
                     {h}:00
@@ -339,17 +383,17 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
             
             {/* Preview */}
             {hasDue && (
-              <div className="flex items-center justify-between py-2 px-3 bg-green-50 rounded-xl">
+              <div className="flex items-center justify-between py-2 px-3 bg-pine-soft rounded-xl">
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                  <span className="text-[11px] font-semibold text-green-700">
+                  <div className="w-1.5 h-1.5 rounded-full bg-pine-soft0" />
+                  <span className="text-[11px] font-semibold text-pine">
                     {formatSelectedDate()} {language === 'zh' ? ' ' : 'at'} {normalizeHour(hour)}:{normalizeMinute(minute)}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => { setSelectedDate(''); setHour('12'); setMinute('00') }}
-                  className="text-[10px] font-medium text-green-600 hover:text-red-500 cursor-pointer"
+                  className="text-[10px] font-medium text-pine hover:text-red-500 cursor-pointer"
                 >
                   {language === 'zh' ? '清除' : 'Clear'}
                 </button>

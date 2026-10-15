@@ -1,6 +1,6 @@
 /**
  * v1.7.0 (2026-10-15)
- * 改动：新增今日/长期两栏；旧任务默认归入今日；清空与排序只作用于当前栏。
+ * 改动：新增今日/长期两栏；旧任务默认归入今日；清空与排序只作用于当前栏。任务说明可在新建和列表里直接写。
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -235,8 +235,16 @@ function App() {
     checkUpdate();
   }, [])
 
-  const addTodo = (text: string, dueTime?: Date | null) => {
-    setTodos(prev => [...prev, { id: crypto.randomUUID(), text, completed: false, dueTime, bucket: activeBucket }])
+  const addTodo = (text: string, dueTime?: Date | null, details?: string) => {
+    const note = details?.trim()
+    setTodos(prev => [...prev, {
+      id: crypto.randomUUID(),
+      text: text.trim(),
+      completed: false,
+      dueTime,
+      details: note || undefined,
+      bucket: activeBucket
+    }])
   }
 
   const toggleTodo = (id: string) => {
@@ -252,7 +260,12 @@ function App() {
   }
 
   const updateDetails = (id: string, details: string) => {
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, details } : t))
+    const note = details.trim()
+    setTodos(prev => prev.map(t => {
+      if (t.id !== id) return t
+      if ((t.details || '') === note) return t
+      return { ...t, details: note || undefined }
+    }))
   }
 
   const reorderTodos = (fromIndex: number, toIndex: number) => {
@@ -337,7 +350,7 @@ function App() {
       {/* Main Container */}
       <div 
         className="relative flex-1 w-full rounded-[28px] overflow-hidden flex flex-col border border-white/60 transition-colors duration-200 backdrop-blur-3xl"
-        style={{ backgroundColor: `rgba(240, 238, 248, ${opacity})` }}
+        style={{ backgroundColor: `rgba(232, 240, 235, ${opacity})` }}
       >
         
         {/* Window Controls */}
@@ -347,12 +360,8 @@ function App() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-3"
           >
-            <motion.div 
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-violet-400 to-purple-600" 
-            />
-            <span className="text-sm font-bold text-neu-text tracking-wide">SoftDo</span>
+            <span className="w-1.5 h-1.5 rounded-[2px] bg-pine" />
+            <span className="text-sm font-semibold text-neu-text">SoftDo</span>
 
             <motion.button 
                 whileHover={{ scale: 1.05 }}
@@ -375,7 +384,7 @@ function App() {
                        setTimeout(() => setShowVersionToast(false), 3000);
                    }
                 }}
-                className="app-no-drag text-[10px] font-black text-neu-text/30 tracking-wider hover:text-violet-500 transition-colors cursor-pointer relative z-50 px-1" 
+                className="app-no-drag text-[10px] font-medium text-stone/80 hover:text-pine transition-colors cursor-pointer relative z-50 px-1" 
                 title="Click to check for updates"
             >
                 {VERSION}
@@ -386,11 +395,11 @@ function App() {
             {/* Opacity Control */}
             <div className="relative" ref={opacityRef}>
               <motion.button
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.85 }}
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.94 }}
                 onClick={() => setShowOpacityControl(!showOpacityControl)}
                 className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer ${
-                  showOpacityControl ? 'bg-violet-500/20 text-violet-600' : 'hover:bg-black/5 text-neu-text/30'
+                  showOpacityControl ? 'bg-pine/15 text-pine' : 'hover:bg-black/5 text-neu-text/30'
                 }`}
               >
                 <Droplet size={11} fill={showOpacityControl ? 'currentColor' : 'none'} strokeWidth={3} />
@@ -415,7 +424,7 @@ function App() {
                       step="0.01"
                       value={opacity}
                       onChange={(e) => setOpacity(parseFloat(e.target.value))}
-                      className="w-full h-1.5 bg-violet-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-violet-500 [&::-webkit-slider-thumb]:shadow-sm outline-none"
+                      className="w-full h-1.5 bg-pine-soft rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-pine [&::-webkit-slider-thumb]:shadow-sm outline-none"
                     />
                     
                     {/* Divider */}
@@ -424,13 +433,13 @@ function App() {
                     {/* Auto Start Toggle */}
                     <button
                       onClick={toggleAutoStart}
-                      className="w-full flex items-center justify-between px-1 py-1 rounded-lg hover:bg-violet-50 transition-colors cursor-pointer"
+                      className="w-full flex items-center justify-between px-1 py-1 rounded-lg hover:bg-pine-soft transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
-                        <Power size={12} className={autoStart ? 'text-violet-600' : 'text-neu-muted/50'} />
+                        <Power size={12} className={autoStart ? 'text-pine' : 'text-neu-muted/50'} />
                         <span className="text-[10px] font-medium text-neu-muted">{t.autoStart}</span>
                       </div>
-                      <div className={`w-7 h-4 rounded-full transition-colors ${autoStart ? 'bg-violet-500' : 'bg-gray-200'} flex items-center px-0.5`}>
+                      <div className={`w-7 h-4 rounded-full transition-colors ${autoStart ? 'bg-pine' : 'bg-gray-200'} flex items-center px-0.5`}>
                         <motion.div 
                           animate={{ x: autoStart ? 12 : 0 }}
                           className="w-3 h-3 bg-white rounded-full shadow-sm"
@@ -448,16 +457,16 @@ function App() {
                         setLanguage(newLang)
                         localStorage.setItem(LANGUAGE_KEY, newLang)
                       }}
-                      className="w-full flex items-center justify-between px-1 py-1 rounded-lg hover:bg-violet-50 transition-colors cursor-pointer"
+                      className="w-full flex items-center justify-between px-1 py-1 rounded-lg hover:bg-pine-soft transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
                         <Globe size={12} className="text-neu-muted/50" />
                         <span className="text-[10px] font-medium text-neu-muted">{t.language}</span>
                       </div>
                       <div className="flex items-center gap-1 text-[10px] font-medium">
-                        <span className={language === 'en' ? 'text-violet-600' : 'text-neu-muted/40'}>EN</span>
+                        <span className={language === 'en' ? 'text-pine' : 'text-neu-muted/40'}>EN</span>
                         <span className="text-neu-muted/30">/</span>
-                        <span className={language === 'zh' ? 'text-violet-600' : 'text-neu-muted/40'}>中</span>
+                        <span className={language === 'zh' ? 'text-pine' : 'text-neu-muted/40'}>中</span>
                       </div>
                     </button>
                   </motion.div>
@@ -466,19 +475,19 @@ function App() {
             </div>
 
             <motion.button
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.85 }}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
               onClick={togglePin}
               className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer ${
-                isPinned ? 'bg-violet-500/20 text-violet-600' : 'hover:bg-black/5 text-neu-text/30'
+                isPinned ? 'bg-pine/15 text-pine' : 'hover:bg-black/5 text-neu-text/30'
               }`}
             >
               <Pin size={11} fill={isPinned ? 'currentColor' : 'none'} strokeWidth={3} />
             </motion.button>
             
             <motion.button
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.85 }}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
               onClick={minimizeApp}
               className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/5 text-neu-text/30 transition-all duration-300 cursor-pointer ml-1"
             >
@@ -486,8 +495,8 @@ function App() {
             </motion.button>
             
             <motion.button
-              whileHover={{ scale: 1.15, backgroundColor: 'rgba(255,107,107,0.1)' }}
-              whileTap={{ scale: 0.85 }}
+              whileHover={{ scale: 1.06, backgroundColor: 'rgba(212,86,78,0.1)' }}
+              whileTap={{ scale: 0.94 }}
               onClick={closeApp}
               className="w-7 h-7 rounded-full flex items-center justify-center hover:text-red-400 text-neu-text/30 transition-all duration-300 cursor-pointer"
             >
@@ -505,23 +514,18 @@ function App() {
               exit={{ height: 0, opacity: 0, marginBottom: 0 }}
               className="px-5 overflow-hidden flex-shrink-0 relative z-40"
             >
-              <div className="bg-gradient-to-r from-violet-50 to-purple-50/80 rounded-xl p-3 flex items-start gap-3 border border-violet-100 shadow-sm relative overflow-hidden">
-                 {/* Sparkle decoration */}
-                <div className="absolute top-0 right-0 p-2 text-violet-200 opacity-20 transform translate-x-1/3 -translate-y-1/3">
-                  <Sparkles size={80} strokeWidth={1} />
-                </div>
-
-                <div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg text-white mt-0.5 shadow-sm z-10">
+              <div className="bg-pine-soft rounded-xl p-3 flex items-start gap-3 border border-pine-line">
+                <div className="p-1.5 bg-pine rounded-lg text-white mt-0.5">
                   <Sparkles size={14} />
                 </div>
                 <div className="flex-1 min-w-0 z-10">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-violet-900 tracking-tight">{t.welcome} {VERSION}!</span>
-                    <button onClick={closeWelcome} className="text-violet-400 hover:text-violet-600 transition-colors p-0.5 hover:bg-violet-100/50 rounded-full">
+                    <span className="text-xs font-bold text-ink tracking-normal">{t.welcome} {VERSION}!</span>
+                    <button onClick={closeWelcome} className="text-pine/75 hover:text-pine-deep transition-colors p-0.5 hover:bg-pine-soft rounded-full">
                       <X size={12} />
                     </button>
                   </div>
-                  <p className="text-[10px] text-violet-600/90 leading-relaxed font-medium">
+                  <p className="text-[11px] text-stone leading-relaxed">
                     {t.welcomeFeatures}
                   </p>
                 </div>
@@ -539,31 +543,31 @@ function App() {
               exit={{ height: 0, opacity: 0, marginBottom: 0 }}
               className="px-5 overflow-hidden flex-shrink-0 relative z-40"
             >
-              <div className="bg-violet-50/80 rounded-xl p-3 flex items-start gap-3 border border-violet-100 mb-2">
-                <div className="p-1.5 bg-violet-100 rounded-lg text-violet-600 mt-0.5">
+              <div className="bg-pine-soft rounded-xl p-3 flex items-start gap-3 border border-pine-line mb-2">
+                <div className="p-1.5 bg-pine-soft rounded-lg text-pine mt-0.5">
                   <Bell size={14} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-violet-900">{t.newVersion} {updateInfo.latestVersion}</span>
-                    <button onClick={closeUpdate} className="text-violet-400 hover:text-violet-600 transition-colors">
+                    <span className="text-xs font-semibold text-ink">{t.newVersion} {updateInfo.latestVersion}</span>
+                    <button onClick={closeUpdate} className="text-pine/75 hover:text-pine-deep transition-colors">
                       <X size={12} />
                     </button>
                   </div>
-                  <p className="text-[10px] text-violet-600/80 mb-2 leading-relaxed">
+                  <p className="text-[10px] text-pine/80 mb-2 leading-relaxed">
                     {t.updateAvailable}
                   </p>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={handleUpdate}
-                      className="flex-1 bg-violet-600 text-white text-[10px] font-medium py-1.5 rounded-lg hover:bg-violet-700 transition-colors flex items-center justify-center gap-1"
+                      className="flex-1 bg-pine text-white text-[10px] font-medium py-1.5 rounded-lg hover:bg-pine-deep transition-colors flex items-center justify-center gap-1"
                     >
                       <span>{t.update}</span>
                       <ArrowRight size={10} />
                     </button>
                     <button 
                       onClick={skipUpdate}
-                      className="px-3 bg-white text-violet-500 text-[10px] font-medium py-1.5 rounded-lg border border-violet-100 hover:bg-violet-50 transition-colors"
+                      className="px-3 bg-white text-pine text-[10px] font-medium py-1.5 rounded-lg border border-pine-line hover:bg-pine-soft transition-colors"
                     >
                       {t.skip}
                     </button>
@@ -596,7 +600,7 @@ function App() {
                       onClick={() => setActiveBucket(tab.key)}
                       className={`px-3 h-8 rounded-[14px] text-xs font-bold transition-all cursor-pointer ${
                         activeBucket === tab.key
-                          ? 'bg-white text-violet-600 shadow-sm'
+                          ? 'bg-white text-pine shadow-sm'
                           : 'text-neu-muted/70 hover:text-neu-text'
                       }`}
                     >
@@ -608,7 +612,7 @@ function App() {
                   key={`${activeBucket}-${remainingCount}`}
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-neu-muted text-xs font-medium tracking-wide"
+                  className="text-neu-muted text-xs font-medium tracking-normal"
                 >
                   {remainingCount} {t.remaining}
                 </motion.p>
@@ -654,9 +658,9 @@ function App() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 }}
-                      className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-violet-50 to-purple-50 flex items-center justify-center border border-violet-100/30"
+                      className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-pine-soft flex items-center justify-center border border-pine-line/60"
                     >
-                      <CircleCheck size={24} className="text-violet-400" />
+                      <CircleCheck size={24} className="text-pine/75" />
                     </motion.div>
                     <motion.p 
                       initial={{ opacity: 0 }}
@@ -704,7 +708,7 @@ function App() {
           <div 
             className="absolute bottom-0 right-0 w-full h-full rounded-tl-3xl transition-all duration-300 ease-out opacity-0 group-hover:opacity-100"
             style={{ 
-              background: `radial-gradient(circle at bottom right, rgba(139, 92, 246, ${Math.max(0.4, opacity * 0.8)}) 0%, transparent 70%)` 
+              background: `radial-gradient(circle at bottom right, rgba(23, 33, 28, 0.18) 0%, transparent 70%)` 
             }}
           />
         </div>
@@ -717,7 +721,7 @@ function App() {
           <div 
             className="absolute bottom-0 left-0 w-full h-full rounded-tr-3xl transition-all duration-300 ease-out opacity-0 group-hover:opacity-100"
             style={{ 
-              background: `radial-gradient(circle at bottom left, rgba(139, 92, 246, ${Math.max(0.4, opacity * 0.8)}) 0%, transparent 70%)` 
+              background: `radial-gradient(circle at bottom left, rgba(23, 33, 28, 0.18) 0%, transparent 70%)` 
             }}
           />
         </div>
@@ -728,17 +732,17 @@ function App() {
                 initial={{ opacity: 0, x: 20, y: 0 }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
                 exit={{ opacity: 0, x: 20, transition: { duration: 0.3 } }}
-                className="absolute bottom-5 right-5 z-[60] flex items-center gap-3 px-4 py-3 bg-white/90 backdrop-blur-xl border border-violet-100/50 rounded-2xl shadow-xl shadow-violet-500/10 overflow-hidden"
+                className="absolute bottom-5 right-5 z-[60] flex items-center gap-3 px-4 py-3 bg-white/90 backdrop-blur-xl border border-pine-line rounded-2xl shadow-xl shadow-pine/10 overflow-hidden"
             >
                 {/* Progress Bar (Purple Line Reducing) */}
                 <motion.div 
                     initial={{ width: '100%' }}
                     animate={{ width: '0%' }}
                     transition={{ duration: 3, ease: 'linear' }}
-                    className="absolute bottom-0 left-0 h-[2px] bg-violet-500"
+                    className="absolute bottom-0 left-0 h-[2px] bg-pine"
                 />
                 
-                <div className="p-1.5 bg-green-50 rounded-full text-green-500">
+                <div className="p-1.5 bg-pine-soft rounded-full text-pine">
                     <CircleCheck size={16} />
                 </div>
                 <div>

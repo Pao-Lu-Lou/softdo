@@ -1,8 +1,8 @@
 /**
  * v1.7.0 (2026-10-15)
- * 改动：透传跨栏移动。
+ * 改动：透传跨栏移动；同一时间只展开一条任务说明。
  */
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Todo, TodoBucket } from '../App'
 import TodoItem from './TodoItem'
@@ -33,7 +33,16 @@ export default function TodoList({
 }: TodoListProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [targetIndex, setTargetIndex] = useState<number | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const openDetails = useCallback((id: string) => setExpandedId(id), [])
+  const closeDetails = useCallback(() => setExpandedId(null), [])
+
+  useEffect(() => {
+    if (expandedId && !todos.some(todo => todo.id === expandedId)) {
+      setExpandedId(null)
+    }
+  }, [todos, expandedId])
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index)
@@ -83,7 +92,7 @@ export default function TodoList({
               stiffness: 500, 
               damping: 30 
             }}
-            draggable
+            draggable={expandedId !== todo.id}
             onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, index)}
             onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent)}
             onDragOver={(e) => handleDragOver(e as unknown as React.DragEvent, index)}
@@ -96,7 +105,7 @@ export default function TodoList({
                   initial={{ opacity: 0, scaleX: 0 }}
                   animate={{ opacity: 1, scaleX: 1 }}
                   exit={{ opacity: 0, scaleX: 0 }}
-                  className="absolute -top-1.5 left-4 right-4 h-0.5 bg-violet-500 rounded-full origin-left z-10"
+                  className="absolute -top-1.5 left-4 right-4 h-0.5 bg-pine rounded-full origin-left z-10"
                 />
               )}
             </AnimatePresence>
@@ -108,7 +117,7 @@ export default function TodoList({
                   initial={{ opacity: 0, scaleX: 0 }}
                   animate={{ opacity: 1, scaleX: 1 }}
                   exit={{ opacity: 0, scaleX: 0 }}
-                  className="absolute -bottom-1.5 left-4 right-4 h-0.5 bg-violet-500 rounded-full origin-left z-10"
+                  className="absolute -bottom-1.5 left-4 right-4 h-0.5 bg-pine rounded-full origin-left z-10"
                 />
               )}
             </AnimatePresence>
@@ -122,6 +131,9 @@ export default function TodoList({
               onUpdateDue={onUpdateDue}
               onMove={onMove}
               language={language}
+              detailsOpen={expandedId === todo.id}
+              onOpenDetails={() => openDetails(todo.id)}
+              onCloseDetails={closeDetails}
             />
           </motion.div>
         ))}
