@@ -1,6 +1,18 @@
+/**
+ * v1.7.2 (2026-10-15)
+ * 改动：主色改为 CSS 变量，滚动条和焦点跟随调色盘。
+ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --pine: 20 92 56;
+  --pine-deep: 11 61 38;
+  --pine-soft: 230 243 236;
+  --pine-line: 197 221 208;
+  --pine-mist: 143 179 158;
+}
 
 @layer base {
   html, body {
@@ -12,7 +24,7 @@
 
   button:focus-visible,
   a:focus-visible {
-    outline: 2px solid #1F7A4D;
+    outline: 2px solid rgb(var(--pine));
     outline-offset: 2px;
   }
 
@@ -29,11 +41,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: rgba(31, 122, 77, 0.22);
+    background-color: rgb(var(--pine) / 0.22);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(31, 122, 77, 0.4);
+    background-color: rgb(var(--pine) / 0.4);
   }
 }
 

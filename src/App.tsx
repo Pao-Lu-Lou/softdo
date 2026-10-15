@@ -1,6 +1,7 @@
 /**
  * v1.7.0 (2026-10-15)
- * 改动：新增今日/长期两栏；旧任务默认归入今日；清空与排序只作用于当前栏。任务说明可在新建和列表里直接写。
+ * v1.7.3 (2026-10-15)
+ * 改动：任务可附加多张图片，只保存文件名；删除任务时清掉图片目录。
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,6 +10,8 @@ import TodoInput from './components/TodoInput'
 import TodoList from './components/TodoList'
 import { getTranslation } from './i18n'
 import type { Language } from './i18n'
+import { applyPineTheme, readSavedPine, DEFAULT_PINE, PINE_KEY, PINE_SWATCHES, normalizeHex } from './theme'
+import { addTaskImages, deleteTaskImage, deleteTaskImageFolder } from './taskImages'
 
 export type TodoBucket = 'today' | 'later'
 
@@ -19,6 +22,7 @@ export interface Todo {
   dueTime?: Date | null;
   details?: string;
   bucket: TodoBucket;
+  images: string[];
 }
 
 interface UpdateInfo {
@@ -45,7 +49,8 @@ function App() {
         return parsed.map((item: Todo) => ({
           ...item,
           dueTime: item.dueTime ? new Date(item.dueTime) : null,
-          bucket: item.bucket === 'later' ? 'later' : 'today'
+          bucket: item.bucket === 'later' ? 'later' : 'today',
+          images: Array.isArray(item.images) ? item.images.filter((name) => typeof name === 'string') : []
         }))
       }
     } catch { /* Ignore parse errors */ }
@@ -64,6 +69,8 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(false)
   const [showVersionToast, setShowVersionToast] = useState(false)
   const opacityRef = useRef<HTMLDivElement>(null)
+  const colorPickingRef = useRef(false)
+  const [pineColor, setPineColor] = useState<string>(() => readSavedPine())
   const [autoStart, setAutoStart] = useState(false)
   const [language, setLanguage] = useState<Language>(() => {
     const saved = localStorage.getItem(LANGUAGE_KEY)
@@ -171,9 +178,15 @@ function App() {
     localStorage.setItem(OPACITY_KEY, opacity.toString())
   }, [opacity])
 
+  useEffect(() => {
+    applyPineTheme(pineColor)
+    localStorage.setItem(PINE_KEY, pineColor)
+  }, [pineColor])
+
   // Click outside to close opacity control
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickingRef.current) return
       if (opacityRef.current && !opacityRef.current.contains(event.target as Node)) {
         setShowOpacityControl(false)
       }
@@ -243,7 +256,8 @@ function App() {
       completed: false,
       dueTime,
       details: note || undefined,
-      bucket: activeBucket
+      bucket: activeBucket,
+      images: []
     }])
   }
 
@@ -253,6 +267,18 @@ function App() {
 
   const deleteTodo = (id: string) => {
     setTodos(prev => prev.filter(t => t.id !== id))
+    void deleteTaskImageFolder(id)
+  }
+
+  const addImages = async (id: string) => {
+    const names = await addTaskImages(id)
+    if (names.length === 0) return
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, images: [...t.images, ...names] } : t))
+  }
+
+  const removeImage = async (id: string, name: string) => {
+    await deleteTaskImage(id, name)
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, images: t.images.filter(item => item !== name) } : t))
   }
   
   const renameTodo = (id: string, newText: string) => {
@@ -411,7 +437,7 @@ function App() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                    className="absolute top-9 right-0 w-40 p-2.5 bg-white/98 backdrop-blur-2xl rounded-xl shadow-xl border border-gray-200/60 flex flex-col gap-2 items-center z-50 origin-top-right"
+                    className="absolute top-9 right-0 w-52 p-2.5 bg-white/98 backdrop-blur-2xl rounded-xl shadow-xl border border-gray-200/60 flex flex-col gap-2 items-center z-50 origin-top-right"
                   >
                     <div className="w-full flex justify-between text-[10px] text-neu-muted font-medium px-0.5">
                       <span>{t.opacity}</span>
@@ -427,7 +453,46 @@ function App() {
                       className="w-full h-1.5 bg-pine-soft rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-pine [&::-webkit-slider-thumb]:shadow-sm outline-none"
                     />
                     
-                    {/* Divider */}
+                    <div className="w-full h-px bg-gray-100" />
+
+                    <div className="w-full flex flex-col gap-1.5 px-0.5">
+                      <div className="w-full flex items-center justify-between">
+                        <span className="text-[10px] text-neu-muted font-medium">{t.accentColor}</span>
+                        <button
+                          type="button"
+                          onClick={() => setPineColor(DEFAULT_PINE)}
+                          className="text-[10px] font-medium text-stone/70 hover:text-pine cursor-pointer"
+                        >
+                          {t.resetColor}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-7 gap-1.5 items-center">
+                        {PINE_SWATCHES.map((swatch) => (
+                          <button
+                            key={swatch}
+                            type="button"
+                            title={swatch}
+                            onClick={() => setPineColor(swatch)}
+                            className={`w-5 h-5 rounded-full border cursor-pointer ${
+                              pineColor === swatch ? 'border-ink ring-2 ring-pine/30' : 'border-black/10'
+                            }`}
+                            style={{ backgroundColor: swatch }}
+                          />
+                        ))}
+                        <label className="w-5 h-5 rounded-full border border-dashed border-stone/40 overflow-hidden cursor-pointer relative">
+                          <span className="absolute inset-[3px] rounded-full" style={{ backgroundColor: pineColor }} />
+                          <input
+                            type="color"
+                            value={pineColor}
+                            onFocus={() => { colorPickingRef.current = true }}
+                            onBlur={() => { window.setTimeout(() => { colorPickingRef.current = false }, 250) }}
+                            onChange={(e) => setPineColor(normalizeHex(e.target.value))}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    
                     <div className="w-full h-px bg-gray-100" />
                     
                     {/* Auto Start Toggle */}
@@ -689,6 +754,8 @@ function App() {
                       onUpdateDue={updateDue}
                       onReorder={reorderTodos}
                       onMove={moveTodo}
+                      onAddImages={addImages}
+                      onRemoveImage={removeImage}
                       language={language}
                     />
                   </motion.div>

@@ -228,7 +228,7 @@ export default function TodoInput({ onAdd, language }: TodoInputProps) {
         <button
           type="submit"
           disabled={!text.trim()}
-          className="bg-pine rounded-[18px] w-[46px] h-[46px] flex items-center justify-center text-white shadow-[0_8px_16px_-10px_rgba(31,122,77,0.9)] disabled:opacity-40 disabled:shadow-none transition-all duration-200 cursor-pointer flex-shrink-0 hover:bg-pine-deep active:scale-[0.98]"
+          className="bg-pine rounded-[18px] w-[46px] h-[46px] flex items-center justify-center text-white shadow-[0_8px_16px_-10px_rgb(var(--pine)/0.9)] disabled:opacity-40 disabled:shadow-none transition-all duration-200 cursor-pointer flex-shrink-0 hover:bg-pine-deep active:scale-[0.98]"
         >
           <Plus size={20} strokeWidth={2.5} />
         </button>

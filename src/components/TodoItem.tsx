@@ -1,14 +1,16 @@
 /**
  * v1.7.0 (2026-10-15)
- * 改动：任务可在今日/长期之间移动。说明在行内展开编辑。
+ * v1.7.6 (2026-10-16)
+ * 改动：查看器退出窗口拖动区，叉号按下即关闭，放大后拖动不再被标题栏抢走。
  */
-import { Check, Trash2, Clock, Pencil, FileText, X, GripVertical, ChevronLeft, ChevronRight, CalendarDays, Layers } from 'lucide-react'
+import { Check, Trash2, Clock, Pencil, FileText, X, GripVertical, ChevronLeft, ChevronRight, CalendarDays, Layers, Image, ImagePlus } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import clsx from 'clsx'
 import type { Todo, TodoBucket } from '../App'
 import { getTranslation } from '../i18n'
 import type { Language } from '../i18n'
+import { readTaskImage } from '../taskImages'
 
 interface TodoItemProps {
   todo: Todo;
@@ -18,6 +20,8 @@ interface TodoItemProps {
   onUpdateDetails: (id: string, details: string) => void;
   onUpdateDue: (id: string, due: Date | null) => void;
   onMove: (id: string, bucket: TodoBucket) => void;
+  onAddImages: (id: string) => Promise<void>;
+  onRemoveImage: (id: string, name: string) => Promise<void>;
   language: Language;
   detailsOpen: boolean;
   onOpenDetails: () => void;
@@ -54,7 +58,7 @@ function formatTimeRemaining(dueTime: Date, t: any): TimeInfo {
   return { text: `${days}d ${hours % 24}h`, urgent: false, overdue: false }
 }
 
-export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateDetails, onUpdateDue, onMove, language, detailsOpen, onOpenDetails, onCloseDetails }: TodoItemProps) {
+export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateDetails, onUpdateDue, onMove, onAddImages, onRemoveImage, language, detailsOpen, onOpenDetails, onCloseDetails }: TodoItemProps) {
   const t = getTranslation(language)
   const [, setTick] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
@@ -77,9 +81,103 @@ export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateD
   const [hour, setHour] = useState('12')
   const [minute, setMinute] = useState('00')
   const [calendarMonth, setCalendarMonth] = useState(new Date())
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [imageIndex, setImageIndex] = useState(0)
+  const [imageSrc, setImageSrc] = useState<string | null>(null)
+  const [imageError, setImageError] = useState(false)
+  const [imageZoom, setImageZoom] = useState(1)
+  const [imagePan, setImagePan] = useState({ x: 0, y: 0 })
+  const images = todo.images ?? []
+  const imageFrameRef = useRef<HTMLDivElement>(null)
+  const imageElRef = useRef<HTMLImageElement>(null)
+  const imageDragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
 
   
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const resetImageView = () => {
+    setImageZoom(1)
+    setImagePan({ x: 0, y: 0 })
+    imageDragRef.current = null
+  }
+
+  const clampImagePan = (x: number, y: number, zoom: number) => {
+    const frame = imageFrameRef.current
+    const img = imageElRef.current
+    if (!frame || zoom <= 1) return { x: 0, y: 0 }
+    let width = frame.clientWidth
+    let height = frame.clientHeight
+    if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      const fit = Math.min(frame.clientWidth / img.naturalWidth, frame.clientHeight / img.naturalHeight)
+      width = img.naturalWidth * fit
+      height = img.naturalHeight * fit
+    }
+    const maxX = Math.max(0, (width * zoom - frame.clientWidth) / 2)
+    const maxY = Math.max(0, (height * zoom - frame.clientHeight) / 2)
+    return {
+      x: Math.min(maxX, Math.max(-maxX, x)),
+      y: Math.min(maxY, Math.max(-maxY, y)),
+    }
+  }
+
+  const openViewer = (index = 0) => {
+    resetImageView()
+    setImageIndex(index)
+    setViewerOpen(true)
+    setShowContextMenu(false)
+  }
+
+  const showImageAt = (index: number) => {
+    resetImageView()
+    setImageIndex(index)
+  }
+
+  const addImages = () => {
+    setShowContextMenu(false)
+    void onAddImages(todo.id)
+  }
+
+  useEffect(() => {
+    if (!viewerOpen) return
+    if (images.length === 0) {
+      setViewerOpen(false)
+      return
+    }
+    const index = Math.min(imageIndex, images.length - 1)
+    if (index !== imageIndex) setImageIndex(index)
+    let cancelled = false
+    setImageSrc(null)
+    setImageError(false)
+    readTaskImage(todo.id, images[index])
+      .then((src) => { if (!cancelled) setImageSrc(src) })
+      .catch(() => { if (!cancelled) setImageError(true) })
+    return () => { cancelled = true }
+  }, [viewerOpen, imageIndex, images, todo.id])
+
+  useEffect(() => {
+    const frame = imageFrameRef.current
+    if (!viewerOpen || !frame) return
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const next = Math.min(4, Math.max(1, imageZoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1)))
+      setImageZoom(next)
+      setImagePan((pan) => clampImagePan(pan.x, pan.y, next))
+    }
+    frame.addEventListener("wheel", onWheel, { passive: false })
+    return () => frame.removeEventListener("wheel", onWheel)
+  }, [viewerOpen, imageZoom, imageSrc])
+
+  useEffect(() => {
+    if (!viewerOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setViewerOpen(false)
+      if (event.key === 'ArrowLeft' && images.length > 0) showImageAt((imageIndex - 1 + images.length) % images.length)
+      if (event.key === 'ArrowRight' && images.length > 0) showImageAt((imageIndex + 1) % images.length)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [viewerOpen, images.length, imageIndex])
   
   // Initialize due picker state when opening
   const openDueModal = () => {
@@ -266,7 +364,7 @@ export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateD
             className={clsx(
               "w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 border",
               todo.completed 
-                ? 'border-pine bg-pine text-white shadow-[0_2px_8px_rgba(31,122,77,0.28)]' 
+                ? 'border-pine bg-pine text-white shadow-[0_2px_8px_rgb(var(--pine)/0.28)]' 
                 : 'border-neu-muted/20 bg-white/50 backdrop-blur-md shadow-inner'
             )}
           >
@@ -329,6 +427,17 @@ export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateD
             )}
           </AnimatePresence>
         </div>
+        {images.length > 0 && (
+          <button
+            type="button"
+            onClick={() => openViewer(0)}
+            title={`${images.length} ${t.imageCount}`}
+            className="flex-shrink-0 self-center inline-flex items-center gap-0.5 h-5 px-1 rounded-md text-pine hover:bg-pine-soft cursor-pointer"
+          >
+            <Image size={12} />
+            <span className="text-[10px] font-bold leading-none">{images.length}</span>
+          </button>
+        )}
         </div>
 
         <div className="flex items-center gap-0.5 pl-10 max-h-0 opacity-0 overflow-hidden pointer-events-none group-hover:max-h-8 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200">
@@ -357,6 +466,14 @@ export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateD
                   title={t.rename}
               >
                   <Pencil size={14} />
+              </motion.button>
+              <motion.button
+                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  onClick={addImages}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-neu-muted/30 hover:text-pine hover:bg-pine-soft transition-all cursor-pointer"
+                  title={t.addImages}
+              >
+                  <ImagePlus size={14} />
               </motion.button>
               <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
@@ -443,6 +560,7 @@ export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateD
             
             <MenuButton icon={<Clock size={13} />} text={t.changeDue} onClick={openDueModal} />
             <MenuButton icon={<FileText size={13} />} text={t.editDetails} onClick={() => { setShowContextMenu(false); onOpenDetails(); }} />
+            <MenuButton icon={<ImagePlus size={13} />} text={t.addImages} onClick={addImages} />
             <MenuButton icon={<Pencil size={13} />} text={t.rename} onClick={() => { setShowContextMenu(false); setEditText(todo.text); setIsEditing(true); }} />
             <MenuButton
               icon={todo.bucket === 'later' ? <CalendarDays size={13} /> : <Layers size={13} />}
@@ -452,6 +570,81 @@ export default function TodoItem({ todo, onToggle, onDelete, onRename, onUpdateD
             
             <div className="h-px bg-gray-100/50 my-1 mx-2" />
             <MenuButton icon={<Trash2 size={13} />} text={t.delete} color="text-red-500" onClick={() => { setShowContextMenu(false); onDelete(todo.id); }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {viewerOpen && images.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="app-no-drag fixed inset-0 bg-black/35 backdrop-blur-sm z-[120] flex items-center justify-center p-4"
+            onClick={() => setViewerOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
+              onClick={(event) => event.stopPropagation()}
+              className="app-no-drag w-[calc(100%-2rem)] h-[calc(100%-2rem)] min-h-0 bg-white rounded-2xl border border-pine-line shadow-xl p-3 flex flex-col gap-3"
+            >
+              <div className="app-no-drag flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-stone">{imageIndex + 1} / {images.length}</span>
+                <button
+                  type="button"
+                  onPointerDown={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setViewerOpen(false)
+                  }}
+                  className="app-no-drag w-8 h-8 rounded-xl flex items-center justify-center text-neu-muted hover:text-neu-text hover:bg-black/5 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div
+                ref={imageFrameRef}
+                onPointerDown={(event) => {
+                  if (imageZoom <= 1) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  imageDragRef.current = { x: event.clientX, y: event.clientY, panX: imagePan.x, panY: imagePan.y }
+                }}
+                onPointerMove={(event) => {
+                  const drag = imageDragRef.current
+                  if (!drag || imageZoom <= 1) return
+                  setImagePan(clampImagePan(drag.panX + event.clientX - drag.x, drag.panY + event.clientY - drag.y, imageZoom))
+                }}
+                onPointerUp={() => { imageDragRef.current = null }}
+                onPointerCancel={() => { imageDragRef.current = null }}
+                className={`flex-1 min-h-0 rounded-xl bg-pine-soft/60 flex items-center justify-center overflow-hidden ${imageZoom > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+              >
+                {imageSrc && !imageError ? (
+                  <img
+                    ref={imageElRef}
+                    src={imageSrc}
+                    alt=""
+                    draggable={false}
+                    style={{ transform: `translate(${imagePan.x}px, ${imagePan.y}px) scale(${imageZoom})` }}
+                    className="h-full w-full object-contain select-none pointer-events-none"
+                  />
+                ) : (
+                  <span className="text-xs text-stone">{imageError ? t.imageMissing : ''}</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <button type="button" onClick={() => showImageAt((imageIndex - 1 + images.length) % images.length)} className="w-8 h-8 rounded-xl flex items-center justify-center text-neu-muted hover:bg-pine-soft hover:text-pine cursor-pointer"><ChevronLeft size={16} /></button>
+                <button type="button" onClick={() => showImageAt((imageIndex + 1) % images.length)} className="w-8 h-8 rounded-xl flex items-center justify-center text-neu-muted hover:bg-pine-soft hover:text-pine cursor-pointer"><ChevronRight size={16} /></button>
+                <button type="button" onClick={addImages} className="w-8 h-8 rounded-xl flex items-center justify-center text-neu-muted hover:bg-pine-soft hover:text-pine cursor-pointer" title={t.addImages}><ImagePlus size={14} /></button>
+                <button
+                  type="button"
+                  onClick={() => { const name = images[imageIndex]; if (name) void onRemoveImage(todo.id, name) }}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-red-400 hover:bg-red-50 cursor-pointer"
+                  title={t.deleteImage}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,4 +1,7 @@
-/** @type {import('tailwindcss').Config} */
+/**
+ * v1.7.2 (2026-10-15)
+ * 改动：pine 色走 CSS 变量，支持运行时调色。
+ */
 export default {
   content: [
     "./index.html",
@@ -13,19 +16,19 @@ export default {
         ink: '#17211C',
         stone: '#6B756F',
         pine: {
-          DEFAULT: '#1F7A4D',
-          deep: '#145C38',
-          soft: '#E6F3EC',
-          line: '#C5DDD0',
-          mist: '#8FB39E',
+          DEFAULT: 'rgb(var(--pine) / <alpha-value>)',
+          deep: 'rgb(var(--pine-deep) / <alpha-value>)',
+          soft: 'rgb(var(--pine-soft) / <alpha-value>)',
+          line: 'rgb(var(--pine-line) / <alpha-value>)',
+          mist: 'rgb(var(--pine-mist) / <alpha-value>)',
         },
         neu: {
           base: '#E8F0EB',
           white: '#FFFFFF',
           text: '#17211C',
           muted: '#6B756F',
-          accent: '#1F7A4D',
-          'accent-hover': '#145C38',
+          accent: 'rgb(var(--pine) / <alpha-value>)',
+          'accent-hover': 'rgb(var(--pine-deep) / <alpha-value>)',
           danger: '#D4564E',
           // Dark Mode Palette
           dark: {

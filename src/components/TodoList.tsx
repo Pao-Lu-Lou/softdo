@@ -1,6 +1,7 @@
 /**
  * v1.7.0 (2026-10-15)
- * 改动：透传跨栏移动；同一时间只展开一条任务说明。
+ * v1.7.3 (2026-10-15)
+ * 改动：透传任务图片的添加和删除。
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -17,6 +18,8 @@ interface TodoListProps {
   onUpdateDue: (id: string, due: Date | null) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onMove: (id: string, bucket: TodoBucket) => void;
+  onAddImages: (id: string) => Promise<void>;
+  onRemoveImage: (id: string, name: string) => Promise<void>;
   language: Language;
 }
 
@@ -29,6 +32,8 @@ export default function TodoList({
   onUpdateDue,
   onReorder,
   onMove,
+  onAddImages,
+  onRemoveImage,
   language 
 }: TodoListProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
@@ -130,6 +135,8 @@ export default function TodoList({
               onUpdateDetails={onUpdateDetails}
               onUpdateDue={onUpdateDue}
               onMove={onMove}
+              onAddImages={onAddImages}
+              onRemoveImage={onRemoveImage}
               language={language}
               detailsOpen={expandedId === todo.id}
               onOpenDetails={() => openDetails(todo.id)}

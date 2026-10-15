@@ -1,11 +1,13 @@
 /**
- * v1.0.1-fork (2026-10-15)
- * 改动：更新检查仓库改为 Pao-Lu-Lou/softdo；Windows AppUserModelId 改为 com.paolulou.softdo，避免与原版 SoftDo 冲突。
+ * v1.7.3 (2026-10-15)
+ * 改动：任务图片存到 userData/task-images，只接受常见图片扩展名。
  */
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, Notification } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import { randomUUID } from 'crypto';
+import { readFile, copyFile, mkdir, unlink, rm } from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +16,72 @@ let mainWindow;
 let tray = null;
 let isPinned = false;
 import { readFileSync } from 'fs';
+
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp']);
+const IMAGE_MIME = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+};
+
+function assertTodoId(todoId) {
+  if (typeof todoId !== 'string' || !/^[a-zA-Z0-9-]{8,80}$/.test(todoId)) {
+    throw new Error('invalid task id');
+  }
+  return todoId;
+}
+
+function assertImageName(name) {
+  if (typeof name !== 'string') throw new Error('invalid image name');
+  const base = path.basename(name);
+  const ext = path.extname(base).toLowerCase();
+  if (base !== name || !IMAGE_EXT.has(ext) || base.includes('..')) {
+    throw new Error('invalid image name');
+  }
+  return base;
+}
+
+function taskImageDir(todoId) {
+  return path.join(app.getPath('userData'), 'task-images', assertTodoId(todoId));
+}
+
+ipcMain.handle('task-images-add', async (_event, todoId) => {
+  const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+  });
+  if (result.canceled || result.filePaths.length === 0) return [];
+  const dir = taskImageDir(todoId);
+  await mkdir(dir, { recursive: true });
+  const saved = [];
+  for (const file of result.filePaths) {
+    const ext = path.extname(file).toLowerCase();
+    if (!IMAGE_EXT.has(ext)) continue;
+    const name = `${randomUUID()}${ext}`;
+    await copyFile(file, path.join(dir, name));
+    saved.push(name);
+  }
+  return saved;
+});
+
+ipcMain.handle('task-images-read', async (_event, todoId, name) => {
+  const fileName = assertImageName(name);
+  const bytes = await readFile(path.join(taskImageDir(todoId), fileName));
+  const mime = IMAGE_MIME[path.extname(fileName).toLowerCase()];
+  return `data:${mime};base64,${bytes.toString('base64')}`;
+});
+
+ipcMain.handle('task-images-delete', async (_event, todoId, name) => {
+  await unlink(path.join(taskImageDir(todoId), assertImageName(name)));
+});
+
+ipcMain.handle('task-images-delete-task', async (_event, todoId) => {
+  await rm(taskImageDir(todoId), { recursive: true, force: true });
+});
+
 
 const packageJson = JSON.parse(readFileSync(path.join(__dirname, '../package.json')));
 const CURRENT_VERSION = packageJson.version;
